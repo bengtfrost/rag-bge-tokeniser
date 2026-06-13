@@ -8,3 +8,4 @@ wheels/
 
 # Virtual environments
 .venv
+tokeniser_cache/
