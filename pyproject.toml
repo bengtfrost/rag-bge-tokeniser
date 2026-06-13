@@ -1,0 +1,12 @@
+[project]
+name = "rag-bge-tokeniser"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp>=1.27.2",
+    "sentencepiece>=0.2.1",
+    "sqlite-vec>=0.1.9",
+    "transformers>=5.11.0",
+]
