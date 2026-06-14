@@ -1,15 +1,17 @@
-# RAG BGE-M3 Tokenizer - Sovereign AI Stack (v2.0.0)
+Th# RAG BGE-M3 Tokenizer - Sovereign AI Stack (v2.0.0)
 
 A high-performance, local RAG (Retrieval-Augmented Generation) solution optimized for Fedora 44 (Sway) and Linux power users. This system utilizes **exact token counting** for chunking and **parallel embedding processing**, orchestrated by the Rust-powered **Goose** agent via a **LiteLLM** gateway.
 
+> **Note:** This project has migrated from `mcp-cli` to **Goose** to provide a stable, agentic environment without hardcoded session timeouts or unstable STDIO handling.
+
 ## ✨ Key Features (v2.0.0)
 
-- **Goose Orchestration:** Migration to a stable, agentic CLI that handles long-running missions without session timeouts.
-- **LiteLLM Gateway:** A central proxy to unify Local LLMs (llama-server) and Cloud APIs (Mistral/Gemini) into a single OpenAI-compatible stream.
+- **Goose Orchestration:** Uses a stable, Rust-based agentic CLI that handles long-running "missions" (like large-scale indexing) without session timeouts.
+- **LiteLLM Gateway:** A central proxy that unifies Local LLMs (llama-server) and Cloud APIs (Mistral/Gemini) into a single OpenAI-compatible stream on Port 4000.
 - **Multi-format Support:** Ingest PDF, Markdown (.md), RST, and plain text.
 - **Exact Tokenization:** Powered by the `BAAI/bge-m3` tokenizer to ensure 1:1 parity between chunking logic and embedding model constraints.
-- **Parallel Indexing:** Uses `asyncio.Semaphore` to process multiple files concurrently.
-- **Sovereign Metadata:** Direct SQL access to the vector database for structural analysis.
+- **Parallel Indexing:** Uses `asyncio.Semaphore` to process multiple files concurrently without blocking the server.
+- **Sovereign Metadata:** Direct SQL access to the vector database for structural analysis and statistics.
 
 ## 🏗 Architecture
 
@@ -39,7 +41,7 @@ graph TD
 
 ### 1. Install Goose (The Orchestrator)
 
-Install the binary directly (Rust-based performance):
+Install the binary directly for maximum performance:
 
 ```bash
 curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
@@ -47,10 +49,12 @@ curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download
 
 ### 2. Configure the Stack
 
-Update your `~/.config/goose/config.yaml` to include your Sovereign tools and point the provider to your LiteLLM gateway:
+Update your `~/.config/goose/config.yaml` to include your Sovereign tools. This configuration uses the `openai` provider type to redirect all traffic to your LiteLLM gateway.
 
 ```yaml
+GOOSE_TELEMETRY_ENABLED: false
 active_provider: openai
+
 providers:
   openai:
     type: openai
@@ -63,35 +67,49 @@ extensions:
     name: rag
     type: stdio
     cmd: /home/USER/.config/rag-bge-tokeniser/.venv/bin/python
-    args: [/home/USER/.config/rag-bge-tokeniser/rag_server.py]
+    args:
+      - /home/USER/.config/rag-bge-tokeniser/rag_server.py
   sqlite:
     enabled: true
     name: sqlite
     type: stdio
     cmd: uvx
-    args: [
-      mcp-server-sqlite,
-      --db-path,
-      /home/USER/.local/share/rag-bge-tokeniser/vectors.db,
-    ]
+    args:
+      - mcp-server-sqlite
+      - --db-path
+      - /home/USER/.local/share/rag-bge-tokeniser/vectors.db
+  filesystem:
+    enabled: true
+    name: filesystem
+    type: stdio
+    cmd: npx
+    args:
+      - "-y"
+      - "@modelcontextprotocol/server-filesystem"
+      - /home/USER/ai-docs
+      - /home/USER/.code
 ```
 
 ### 3. Setup Aliases (~/.zshrc)
 
+To ensure stability and bypass Linux keyring issues, we use environment variables to route traffic through the LiteLLM gateway:
+
 ```bash
 # Gateway ensured start
-alias goose-local='export OPENAI_API_KEY="sk-unused" && export OPENAI_BASE_URL="http://localhost:4000/v1" && GOOSE_MODEL=local goose session'
-
-# Start the full Sovereign RAG stack
-rag-start-full() {
-    pkill -f "port 11434" ; pkill -f "port 4000"
-    # Start your local llama-servers, LiteLLM proxy, and then Goose
-    # ...
-    goose-local
+_ensure_litellm() {
+    if ! ss -tulpn | grep -q ":4000 "; then
+        v_litellm && litellm -c ~/.config/litellm/config.yaml > /dev/null 2>&1 &
+        while ! ss -tulpn | grep -q ":4000 "; do sleep 1; done
+    fi
 }
+
+alias goose-local='_ensure_litellm && export OPENAI_API_KEY="sk-unused" && export OPENAI_BASE_URL="http://localhost:4000/v1" && GOOSE_MODEL=local goose session'
+alias goose-smart='_ensure_litellm && export OPENAI_API_KEY="sk-unused" && export OPENAI_BASE_URL="http://localhost:4000/v1" && GOOSE_MODEL=mistral-large-latest goose session'
 ```
 
 ## ⚙️ Environment Variables (Optional)
+
+You can tune the RAG performance via environment variables in the shell where the server is launched:
 
 | Variable             | Description                   | Default |
 | :------------------- | :---------------------------- | :------ |
@@ -101,8 +119,8 @@ rag-start-full() {
 ## 📂 Project Structure
 
 - `rag_server.py`: Core MCP logic & Exact Tokenizer.
-- `server_config.json`: Legacy/External MCP config.
-- `vectors.db`: SQLite-vec database.
+- `vectors.db`: SQLite-vec database (Location: `~/.local/share/rag-bge-tokeniser/`).
+- `config.yaml`: The primary Goose configuration file.
 
 ---
 
