@@ -27,18 +27,18 @@ from pypdf import PdfReader
 DB_PATH = os.path.expanduser("~/.local/share/rag-bge-tokeniser/vectors.db")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-TOKENISER_CACHE = os.path.expanduser("~/.config/mcp-cli/rag-bge-tokeniser/tokeniser_cache")
+TOKENISER_CACHE = os.path.expanduser("~/.config/rag-bge-tokeniser/tokeniser_cache")
 
-EMBED_URL       = "http://localhost:11435/v1/embeddings"
-RERANK_URL      = "http://localhost:11436/rerank"
-TIMEOUT         = 7200   # 2 timmar för tunga juridiska dokument
+EMBED_URL = "http://localhost:11435/v1/embeddings"
+RERANK_URL = "http://localhost:11436/rerank"
+TIMEOUT = 7200  # 2 timmar för tunga juridiska dokument
 
 # Läs konfiguration från miljövariabler (med standardvärden)
-CHUNK_SIZE        = int(os.environ.get("RAG_CHUNK_SIZE", "512"))
-CHUNK_OVERLAP     = int(os.environ.get("RAG_CHUNK_OVERLAP", "64"))
-EMBED_BATCH_SIZE  = int(os.environ.get("RAG_EMBED_BATCH_SIZE", "8"))
+CHUNK_SIZE = int(os.environ.get("RAG_CHUNK_SIZE", "512"))
+CHUNK_OVERLAP = int(os.environ.get("RAG_CHUNK_OVERLAP", "64"))
+EMBED_BATCH_SIZE = int(os.environ.get("RAG_EMBED_BATCH_SIZE", "8"))
 RERANK_CANDIDATES = int(os.environ.get("RAG_RERANK_CANDIDATES", "20"))
-RERANK_MIN_SCORE  = float(os.environ.get("RAG_RERANK_MIN_SCORE", "0.1"))
+RERANK_MIN_SCORE = float(os.environ.get("RAG_RERANK_MIN_SCORE", "0.1"))
 MAX_CONCURRENT_FILES = int(os.environ.get("RAG_MAX_CONCURRENT", "3"))
 
 # Standardändelser som stöds av extract_text_from_file
@@ -47,6 +47,7 @@ SUPPORTED_EXTENSIONS: set[str] = {".txt", ".pdf", ".md", ".rst", ".text"}
 
 
 # ========== HJÄLPFUNKTIONER ================================================
+
 
 def extract_text_from_file(file_path: str, encoding: str = "utf-8") -> str:
     """
@@ -136,6 +137,7 @@ def get_tokenizer():
 
 # ========== TEXTBEARBETNING ================================================
 
+
 def split_into_sentences(text: str) -> list[str]:
     """Delar upp text i meningar med hänsyn till svenska tecken och stycken."""
     text = re.sub(r"(?<!\n)\n(?!\n)", " ", text)
@@ -199,8 +201,9 @@ def chunk_text_exact(text: str, max_tokens: int, overlap_tokens: int) -> list[st
                 overlap_tok += t
 
             current_sents = overlap_sents
-            current_sent_tokens = [sentence_tokens[idx] for idx in
-                                   range(i - len(current_sents), i)]  # O(m) men m är litet
+            current_sent_tokens = [
+                sentence_tokens[idx] for idx in range(i - len(current_sents), i)
+            ]  # O(m) men m är litet
             current_tokens = overlap_tok
 
         current_sents.append(sent)
@@ -237,15 +240,14 @@ with conn:
             embedding  FLOAT[1024]
         )
     """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_docs_collection ON docs(collection)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_docs_collection ON docs(collection)")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_docs_parent ON docs(parent_id, collection)"
     )
 
 
 # ========== NÄTVERKSANROP ==================================================
+
 
 async def get_embeddings(
     texts: list[str],
@@ -267,9 +269,9 @@ async def get_embeddings(
     """
     all_embeddings: list[list[float]] = []
     total_batches = -(-len(texts) // EMBED_BATCH_SIZE)  # ceil division
-    job_total     = progress_total if progress_total > 0 else len(texts)
-    prefix        = f"[{label}] " if label else ""
-    t_start       = time.monotonic()
+    job_total = progress_total if progress_total > 0 else len(texts)
+    prefix = f"[{label}] " if label else ""
+    t_start = time.monotonic()
 
     async with httpx.AsyncClient(timeout=TIMEOUT) as client:
         for batch_num, i in enumerate(range(0, len(texts), EMBED_BATCH_SIZE), start=1):
@@ -285,16 +287,16 @@ async def get_embeddings(
             )
 
             # ETA-beräkning: visa "beräknar..." på första batchen då elapsed≈0
-            elapsed     = time.monotonic() - t_start
+            elapsed = time.monotonic() - t_start
             done_chunks = progress_offset + i + len(batch_texts)
-            bar         = progress_bar(done_chunks, job_total)
+            bar = progress_bar(done_chunks, job_total)
 
             if batch_num == 1:
                 eta_str = "ETA: beräknar..."
             else:
                 avg_per_chunk = elapsed / max(i + len(batch_texts), 1)
-                remaining     = job_total - done_chunks
-                eta_str       = f"ETA: {fmt_seconds(remaining * avg_per_chunk)}"
+                remaining = job_total - done_chunks
+                eta_str = f"ETA: {fmt_seconds(remaining * avg_per_chunk)}"
 
             debug_log(
                 f"{prefix}Embeddings batch {batch_num}/{total_batches} {bar}  {eta_str}"
@@ -327,7 +329,7 @@ async def rerank(
         resp.raise_for_status()
         results = resp.json()["results"]
 
-    indexed  = sorted(results, key=lambda x: x["relevance_score"], reverse=True)
+    indexed = sorted(results, key=lambda x: x["relevance_score"], reverse=True)
     filtered = [r for r in indexed if r["relevance_score"] > RERANK_MIN_SCORE]
     debug_log(
         f"Reranking klar: {len(filtered)} träffar över tröskel {RERANK_MIN_SCORE}."
@@ -336,6 +338,7 @@ async def rerank(
 
 
 # ========== INDEXERINGSHJÄLP ===============================================
+
 
 def _purge_document(coll: str, parent_id: str):
     """
@@ -522,8 +525,8 @@ async def list_tools() -> list[types.Tool]:
                         "items": {"type": "string"},
                         "description": (
                             "Lista med filändelser att indexera (skiftlägesokänsliga). "
-                            "Standard: [\".txt\", \".pdf\", \".md\", \".rst\", \".text\"]. "
-                            "Exempel: [\".pdf\"] indexerar bara PDF-filer."
+                            'Standard: [".txt", ".pdf", ".md", ".rst", ".text"]. '
+                            'Exempel: [".pdf"] indexerar bara PDF-filer.'
                         ),
                     },
                     "encoding": {
@@ -552,8 +555,8 @@ async def list_tools() -> list[types.Tool]:
                 "type": "object",
                 "properties": {
                     "collection": {"type": "string"},
-                    "ids":        {"type": "array", "items": {"type": "string"}},
-                    "documents":  {"type": "array", "items": {"type": "string"}},
+                    "ids": {"type": "array", "items": {"type": "string"}},
+                    "documents": {"type": "array", "items": {"type": "string"}},
                     "force": {
                         "type": "boolean",
                         "description": (
@@ -572,7 +575,7 @@ async def list_tools() -> list[types.Tool]:
                 "type": "object",
                 "properties": {
                     "collection": {"type": "string"},
-                    "query":      {"type": "string"},
+                    "query": {"type": "string"},
                     "top_k": {
                         "type": "integer",
                         "description": "Antal resultat (standard: 5)",
@@ -645,12 +648,14 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         """
         Indexerar en enskild fil från disk.
         """
-        coll      = arguments["collection"]
+        coll = arguments["collection"]
         file_path = arguments["file_path"]
-        encoding  = arguments.get("encoding", "utf-8")
-        force     = arguments.get("force", False)
+        encoding = arguments.get("encoding", "utf-8")
+        force = arguments.get("force", False)
 
-        doc_id = arguments.get("document_id") or safe_doc_id(os.path.basename(file_path))
+        doc_id = arguments.get("document_id") or safe_doc_id(
+            os.path.basename(file_path)
+        )
 
         if not os.path.isfile(file_path):
             return [
@@ -688,9 +693,9 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                 ]
             debug_log(f"force=True: re-indexerar '{doc_id}'...")
 
-        t0      = time.monotonic()
-        chunks  = chunk_text_exact(text, CHUNK_SIZE, CHUNK_OVERLAP)
-        total   = await _index_chunks(coll, doc_id, chunks)
+        t0 = time.monotonic()
+        chunks = chunk_text_exact(text, CHUNK_SIZE, CHUNK_OVERLAP)
+        total = await _index_chunks(coll, doc_id, chunks)
         elapsed = time.monotonic() - t0
 
         if total == 0:
@@ -713,14 +718,15 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         """
         Indexerar alla matchande filer i en katalog med parallell bearbetning.
         """
-        coll     = arguments["collection"]
+        coll = arguments["collection"]
         dir_path = arguments["directory_path"]
         encoding = arguments.get("encoding", "utf-8")
-        force    = arguments.get("force", False)
+        force = arguments.get("force", False)
 
         raw_exts = arguments.get("file_extensions", list(SUPPORTED_EXTENSIONS))
-        exts: set[str] = {e.lower() if e.startswith(".") else f".{e.lower()}"
-                          for e in raw_exts}
+        exts: set[str] = {
+            e.lower() if e.startswith(".") else f".{e.lower()}" for e in raw_exts
+        }
 
         if not os.path.isdir(dir_path):
             return [
@@ -730,8 +736,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             ]
 
         files = sorted(
-            f for f in os.listdir(dir_path)
-            if os.path.splitext(f)[1].lower() in exts
+            f for f in os.listdir(dir_path) if os.path.splitext(f)[1].lower() in exts
         )
 
         if not files:
@@ -764,7 +769,9 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                 chunks = chunk_text_exact(text, CHUNK_SIZE, CHUNK_OVERLAP)
                 prepared.append((fp, doc_id, chunks, None))
                 total_chunks_estimate += len(chunks)
-                debug_log(f"  Chunkat: '{filename}' (doc_id='{doc_id}') → {len(chunks)} segment")
+                debug_log(
+                    f"  Chunkat: '{filename}' (doc_id='{doc_id}') → {len(chunks)} segment"
+                )
             except Exception as e:
                 prepared.append((fp, doc_id, [], str(e)))
                 debug_log(f"  Fel vid läsning av '{filename}': {e}")
@@ -777,7 +784,9 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         # ── Andra pass: parallell indexering med semafor ──
         sem = asyncio.Semaphore(MAX_CONCURRENT_FILES)
 
-        async def index_one(fp: str, doc_id: str, chunks: list[str], err: Optional[str]) -> tuple[str, int, str]:
+        async def index_one(
+            fp: str, doc_id: str, chunks: list[str], err: Optional[str]
+        ) -> tuple[str, int, str]:
             if err:
                 return (os.path.basename(fp), 0, err)
             if not chunks:
@@ -792,7 +801,9 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                 except Exception as e:
                     return (os.path.basename(fp), 0, f"fel – {e}")
 
-        tasks = [index_one(fp, doc_id, chunks, err) for (fp, doc_id, chunks, err) in prepared]
+        tasks = [
+            index_one(fp, doc_id, chunks, err) for (fp, doc_id, chunks, err) in prepared
+        ]
         results = await asyncio.gather(*tasks)
 
         # Sammanställ resultat
@@ -816,9 +827,9 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         """
         Indexerar råtext-strängar som skickas direkt.
         """
-        coll  = arguments["collection"]
-        ids   = arguments["ids"]
-        docs  = arguments["documents"]
+        coll = arguments["collection"]
+        ids = arguments["ids"]
+        docs = arguments["documents"]
         force = arguments.get("force", False)
 
         conn.execute("INSERT OR IGNORE INTO collections (name) VALUES (?)", (coll,))
@@ -846,7 +857,9 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         if total_chunks == 0 and not skipped:
             return [types.TextContent(type="text", text="Ingen text att indexera.")]
 
-        msg = f"✓ Indexerade {total_chunks} segment i '{coll}' på {fmt_seconds(elapsed)}."
+        msg = (
+            f"✓ Indexerade {total_chunks} segment i '{coll}' på {fmt_seconds(elapsed)}."
+        )
         if skipped:
             skipped_list = ", ".join(f"'{s}'" for s in skipped)
             msg += (
@@ -857,7 +870,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
 
     # ------------------------------------------------------------------ #
     elif name == "query":
-        coll  = arguments["collection"]
+        coll = arguments["collection"]
         query = arguments["query"]
         top_k = arguments.get("top_k", 5)
 
@@ -886,7 +899,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             f"WHERE id IN ({','.join(['?'] * len(chunk_ids))})",
             chunk_ids,
         ).fetchall()
-        doc_map   = {row[0]: (row[1], row[2]) for row in rows}
+        doc_map = {row[0]: (row[1], row[2]) for row in rows}
         valid_ids = [cid for cid in chunk_ids if cid in doc_map]
 
         reranked = await rerank(query, [doc_map[cid][0] for cid in valid_ids], top_k)
@@ -931,7 +944,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
     # ------------------------------------------------------------------ #
     elif name == "delete_documents":
         coll = arguments["collection"]
-        ids  = arguments["ids"]
+        ids = arguments["ids"]
 
         row = conn.execute(
             "SELECT name FROM collections WHERE name = ?", (coll,)
@@ -945,7 +958,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             ]
 
         if ids:
-            missing  = [pid for pid in ids if not _doc_exists(coll, pid)]
+            missing = [pid for pid in ids if not _doc_exists(coll, pid)]
             existing = [pid for pid in ids if _doc_exists(coll, pid)]
 
             if missing and not existing:
@@ -1018,13 +1031,13 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
             """,
             (coll,),
         ).fetchone()
-        doc_count   = stats[0] if stats else 0
+        doc_count = stats[0] if stats else 0
         chunk_count = stats[1] if stats else 0
 
         with conn:
-            conn.execute("DELETE FROM vectors WHERE collection = ?",    (coll,))
-            conn.execute("DELETE FROM docs WHERE collection = ?",       (coll,))
-            conn.execute("DELETE FROM collections WHERE name = ?",      (coll,))
+            conn.execute("DELETE FROM vectors WHERE collection = ?", (coll,))
+            conn.execute("DELETE FROM docs WHERE collection = ?", (coll,))
+            conn.execute("DELETE FROM collections WHERE name = ?", (coll,))
 
         debug_log(
             f"Samling '{coll}' borttagen ({doc_count} dok, {chunk_count} segment)."
@@ -1058,3 +1071,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
