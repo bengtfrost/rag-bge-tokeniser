@@ -1,57 +1,110 @@
-# RAG BGE-M3 Tokenizer - Local AI Stack (v2.0.0)
+# RAG BGE-M3 Tokenizer - Sovereign AI Stack (v2.0.0)
 
-A high-performance, local RAG (Retrieval-Augmented Generation) solution optimized for Fedora 44 (Sway) and Linux environments. This system utilizes exact token counting for chunking and parallel embedding processing to ensure maximum performance when indexing large legal archives or personal document collections.
+A high-performance, local RAG (Retrieval-Augmented Generation) solution optimized for Fedora 44 (Sway) and Linux power users. This system utilizes **exact token counting** for chunking and **parallel embedding processing**, orchestrated by the Rust-powered **Goose** agent via a **LiteLLM** gateway.
 
-## ✨ What's New in v2.0.0
+## ✨ Key Features (v2.0.0)
 
+- **Goose Orchestration:** Migration to a stable, agentic CLI that handles long-running missions without session timeouts.
+- **LiteLLM Gateway:** A central proxy to unify Local LLMs (llama-server) and Cloud APIs (Mistral/Gemini) into a single OpenAI-compatible stream.
 - **Multi-format Support:** Ingest PDF, Markdown (.md), RST, and plain text.
-- **Parallel Indexing:** Uses `asyncio.Semaphore` to process multiple files concurrently without blocking the server.
-- **Force Re-indexing:** Support for the `force=true` flag to overwrite and update existing documents.
-- **Environment Configurable:** Control batch sizes, chunk sizes, and timeouts via environment variables.
-- **Robust ID Handling:** Normalized `doc_id` generation (e.g., `document.pdf`) to prevent collisions across different formats.
+- **Exact Tokenization:** Powered by the `BAAI/bge-m3` tokenizer to ensure 1:1 parity between chunking logic and embedding model constraints.
+- **Parallel Indexing:** Uses `asyncio.Semaphore` to process multiple files concurrently.
+- **Sovereign Metadata:** Direct SQL access to the vector database for structural analysis.
 
 ## 🏗 Architecture
 
-- **LLM Engine:** `llama-server` (Port 11434) - Handles reasoning and chat.
-- **Embedding Engine:** `llama-server` @ BGE-M3 (Port 11435) - Generates 1024-dim vectors.
-- **Reranker Engine:** `llama-server` @ BGE-Reranker-v2-m3 (Port 11436) - Scores search results for accuracy.
-- **Database:** SQLite with the `sqlite-vec` extension for local vector storage and metadata.
+```mermaid
+graph TD
+    A[Goose Agent] -->|Port 4000| B(LiteLLM Gateway)
+    B -->|Port 11434| C(Local LLM: Gemma/DeepSeek)
+    B -->|Cloud API| D(Mistral/Gemini)
+    A --- |MCP: STDIO| E{Sovereign Tools}
+    E --> G1[rag_server: v2.0 RAG]
+    E --> G2[sqlite-vec: Direct SQL]
+    E --> G3[filesystem/fetch]
+```
+
+## 🛠 MCP Tools
+
+| Tool                 | Description                                                       |
+| :------------------- | :---------------------------------------------------------------- |
+| `create_collection`  | Create a new RAG collection.                                      |
+| `ingest_file`        | Index a file (Text, PDF, or Markdown) directly from disk.         |
+| `ingest_directory`   | Batch index an entire directory with progress bars and ETA.       |
+| `query`              | Hybrid search using Vector ANN followed by a BGE-Reranking stage. |
+| `sqlite__read_query` | Perform raw SQL queries on the metadata and vector stats.         |
+| `delete_documents`   | Selective deletion or full collection purge.                      |
+
+## 🚀 Installation & Setup
+
+### 1. Install Goose (The Orchestrator)
+
+Install the binary directly (Rust-based performance):
+
+```bash
+curl -fsSL https://github.com/aaif-goose/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash
+```
+
+### 2. Configure the Stack
+
+Update your `~/.config/goose/config.yaml` to include your Sovereign tools and point the provider to your LiteLLM gateway:
+
+```yaml
+active_provider: openai
+providers:
+  openai:
+    type: openai
+    base_url: http://localhost:4000/v1
+    api_key: sk-unused
+
+extensions:
+  rag:
+    enabled: true
+    name: rag
+    type: stdio
+    cmd: /home/USER/.config/rag-bge-tokeniser/.venv/bin/python
+    args: [/home/USER/.config/rag-bge-tokeniser/rag_server.py]
+  sqlite:
+    enabled: true
+    name: sqlite
+    type: stdio
+    cmd: uvx
+    args: [
+      mcp-server-sqlite,
+      --db-path,
+      /home/USER/.local/share/rag-bge-tokeniser/vectors.db,
+    ]
+```
+
+### 3. Setup Aliases (~/.zshrc)
+
+```bash
+# Gateway ensured start
+alias goose-local='export OPENAI_API_KEY="sk-unused" && export OPENAI_BASE_URL="http://localhost:4000/v1" && GOOSE_MODEL=local goose session'
+
+# Start the full Sovereign RAG stack
+rag-start-full() {
+    pkill -f "port 11434" ; pkill -f "port 4000"
+    # Start your local llama-servers, LiteLLM proxy, and then Goose
+    # ...
+    goose-local
+}
+```
 
 ## ⚙️ Environment Variables (Optional)
 
-| Variable               | Description                         | Default |
-| :--------------------- | :---------------------------------- | :------ |
-| `RAG_CHUNK_SIZE`       | Maximum tokens per segment          | 512     |
-| `RAG_CHUNK_OVERLAP`    | Overlapping tokens between segments | 64      |
-| `RAG_MAX_CONCURRENT`   | Max files indexed in parallel       | 3       |
-| `RAG_EMBED_BATCH_SIZE` | Chunks per embedding API call       | 8       |
+| Variable             | Description                   | Default |
+| :------------------- | :---------------------------- | :------ |
+| `RAG_CHUNK_SIZE`     | Maximum tokens per segment    | 512     |
+| `RAG_MAX_CONCURRENT` | Max files indexed in parallel | 3       |
 
-## 🛠 Tools
+## 📂 Project Structure
 
-| Tool                | Description                                                                                                                                               |
-| :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `create_collection` | Create a new RAG collection in the database.                                                                                                              |
-| `ingest_file`       | Index a file (Text, PDF, or Markdown) directly from disk. Optimized for large files to bypass LLM context limits. Supports re-indexing with `force=true`. |
-| `ingest_directory`  | Batch index an entire directory. Supports `.txt`, `.pdf`, `.md`, and more. Features parallel processing, progress bars, and ETA reporting.                |
-| `add_documents`     | Index raw text strings directly (e.g., short notes, chat snippets, or clippings).                                                                         |
-| `query`             | Perform a semantic search within a collection using Vector ANN followed by a Reranking stage.                                                             |
-| `list_collections`  | List all collections in the database with document counts.                                                                                                |
-| `delete_documents`  | Remove specific documents by ID or clear an entire collection (by passing an empty list `[]`).                                                            |
-| `delete_collection` | Permanently delete a collection, including all documents, chunks, and metadata.                                                                           |
+- `rag_server.py`: Core MCP logic & Exact Tokenizer.
+- `server_config.json`: Legacy/External MCP config.
+- `vectors.db`: SQLite-vec database.
 
-## 🚀 Quickstart
+---
 
-### 1. Setup your Alias (~/.zshrc or ~/.bashrc)
-
-```bash
-alias ai-agent-rag='export OPENAI_API_KEY="sk-unused" && \
-  export MCP_STREAMING_FIRST_CHUNK_TIMEOUT=3600 && \
-  export MCP_STREAMING_CHUNK_TIMEOUT=3600 && \
-  export MCP_STREAMING_GLOBAL_TIMEOUT=3600 && \
-  uvx mcp-cli chat \
-    --provider openai_compatible \
-    --api-base "http://localhost:11434/v1" \
-    --api-key "sk-unused" \
-    --model "local" \
-    --config-file ~/.config/mcp-cli/server_config.json'
-```
+**Author:** [Bengt Frost](https://github.com/bengtfrost)\
+**License:** MIT
