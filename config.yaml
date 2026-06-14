@@ -1,0 +1,23 @@
+# ── LOKAL PROVIDER (llama-server) ──
+openai_compatible:
+  client_class: "chuk_llm.llm.providers.openai_client:OpenAILLMClient"
+  api_base: "http://localhost:11434/v1"
+  api_key: "sk-unused"
+  default_model: "local"
+  models: ["*"]
+
+# ── MISTRAL CLOUD PROVIDER ──
+mistral:
+  client_class: "chuk_llm.llm.providers.openai_client:OpenAILLMClient"
+  api_base: "https://api.mistral.ai/v1"
+  api_key: "sk-unused"
+  default_model: "mistral-large-latest"
+  models: ["*"]
+
+# ── GEMINI CLOUD PROVIDER ──
+gemini:
+  client_class: "chuk_llm.llm.providers.openai_client:OpenAILLMClient"
+  api_base: "http://localhost:4000/v1" # Går via LiteLLM för thought_signature
+  api_key: "sk-unused"
+  default_model: "gemini-3.5-flash"
+  models: ["*"] # Löser ValueError

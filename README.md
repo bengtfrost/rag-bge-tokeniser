@@ -1,49 +1,55 @@
-# RAG BGE-M3 Tokeniser - Local AI Stack
+# RAG BGE-M3 Tokeniser - Local AI Stack (v2.0.0)
 
-En högpresterande, lokal RAG-lösning (Retrieval-Augmented Generation) byggd för Fedora 44 (Sway) som utnyttjar MCP (Model Context Protocol) för att ge lokala LLM:er tillgång till juridisk doktrin och personlig data med exakt token-kontroll.
+En högoptimerad, lokal RAG-lösning för Fedora 44 (Sway). Systemet använder exakt token-räkning för chunking och parallell embedding-bearbetning för maximal prestanda vid indexering av stora juridiska arkiv.
 
-## 🏗 Arkitektur & Kedja
+## ✨ Nyheter i v2.0.0
 
-Systemet är uppbyggt som en distribuerad mikrotjänst-arkitektur lokalt:
+- **Multi-format Support:** Ingest av PDF, Markdown (.md), RST och ren text.
+- **Parallell Indexering:** Använder `asyncio.Semaphore` för att bearbeta flera filer samtidigt utan att blockera.
+- **Force Re-indexing:** Stöd för `--force` flagga för att uppdatera existerande dokument.
+- **Konfigurerbar via Env:** Styr batch-storlekar, chunk-storlek och timeouts via miljövariabler.
+- **Robust ID-hantering:** Normaliserade `doc_id` (t.ex. `lag.pdf`) för att undvika kollisioner.
 
-1.  **Inference (Port 11434):** `llama-server` kör modeller (Gemma, Qwen, DeepSeek) för resonemang.
-2.  **Embedding (Port 11435):** `llama-server` med `bge-m3.gguf` genererar vektorer (1024 dim).
-3.  **Reranking (Port 11436):** `llama-server` med `bge-reranker-v2-m3` för poängsättning av sökresultat.
-4.  **MCP Hub (`mcp-cli`):** Fungerar som brygga mellan LLM och verktyg.
-5.  **RAG Server (`rag_server.py`):** 
-    *   **Logic:** Custom Python MCP-server.
-    *   **Chunking:** Exakt token-count via `transformers` (BGE-M3 tokeniser).
-    *   **Storage:** SQLite med `sqlite-vec` extension för vektorsökning.
-6.  **SQL Server (`mcp-server-sqlite`):** Ger direkt SQL-åtkomst till `vectors.db` för metadata-analys.
+## 🏗 Arkitektur
 
-## 🛠 Installation & Setup
+- **LLM Engine:** `llama-server` (Port 11434)
+- **Embedding Engine:** `llama-server` @ BGE-M3 (Port 11435)
+- **Reranker Engine:** `llama-server` @ BGE-Reranker-v2-m3 (Port 11436)
+- **Database:** SQLite med `sqlite-vec` för vektorsökning.
 
-### Miljö
+## ⚙️ Miljövariabler (Optional)
+
+| Variabel               | Beskrivning                              | Standard |
+| :--------------------- | :--------------------------------------- | :------- |
+| `RAG_CHUNK_SIZE`       | Max tokens per segment                   | 512      |
+| `RAG_CHUNK_OVERLAP`    | Överlappande tokens                      | 64       |
+| `RAG_MAX_CONCURRENT`   | Max antal filer som indexeras parallellt | 3        |
+| `RAG_EMBED_BATCH_SIZE` | Chunks per embedding-anrop               | 8        |
+
+## 🛠 Verktyg (Tools)
+
+- `ingest_file`: Indexera enskild fil (PDF/MD/TXT).
+- `ingest_directory`: Massindexera kataloger med progress-bar och ETA.
+- `query`: Hybrid-sökning med Vektor + Reranking.
+- `list_collections`: Statistik över dokument per samling.
+- `delete_documents`: Selektiv radering eller rensning av samling.
+
+## 🚀 Snabbstart
+
 ```bash
-mkdir -p ~/.config/mcp-cli/rag-bge-tokeniser
-cd ~/.config/mcp-cli/rag-bge-tokeniser
-uv init --no-readme
-uv venv
-uv add sqlite-vec httpx mcp transformers sentencepiece
+# Starta agenten (~/.zshrc alias)
+alias ai-agent-rag='export OPENAI_API_KEY="sk-unused" && \
+  export MCP_STREAMING_FIRST_CHUNK_TIMEOUT=3600 && \
+  export MCP_STREAMING_CHUNK_TIMEOUT=3600 && \
+  export MCP_STREAMING_GLOBAL_TIMEOUT=3600 && \
+  uvx mcp-cli chat \
+    --provider openai_compatible \
+    --api-base "http://localhost:11434/v1" \
+    --api-key "sk-unused" \
+    --model "local" \
+    --config-file ~/.config/mcp-cli/server_config.json'
+
+# Exempel: Indexera en juridisk PDF
+# Inuti chatten:
+# "Ingest /home/bfrost/ai-docs/juridik/doktrin/Offentlig_ratt_allmant.pdf till juridik_doktrin"
 ```
-
-### Komponenter
-- **Databas:** `~/.local/share/rag-bge-tokeniser/vectors.db`
-- **Tokenizer Cache:** Lokalt lagrad BGE-M3 modell för offline-användning.
-- **Server:** `rag_server.py` (hanterar ingest, query, rerank och management).
-
-## 🚀 Verktyg (Tools)
-
-| Server | Verktyg | Funktion |
-| :--- | :--- | :--- |
-| **rag** | `ingest_directory` | Massindexering med progressbar och ETA. |
-| **rag** | `query` | Hybrid sökning (Vektor + Rerank). |
-| **sqlite** | `read_query` | Direkt SQL-analys av vektordatabasen. |
-| **filesystem** | `read_text_file` | Låter agenten läsa källfiler. |
-
-## 📁 Filstruktur
-- `rag_server.py`: Huvudservern för RAG-logik.
-- `server_config.json`: Konfiguration för MCP-klienter.
-- `tokeniser_cache/`: Lokala filer för BGE-tokenisern.
-- `vectors.db`: SQLite-databas med vektortabeller.
-

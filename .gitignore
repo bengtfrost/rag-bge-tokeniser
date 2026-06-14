@@ -9,3 +9,7 @@ wheels/
 # Virtual environments
 .venv
 tokeniser_cache/
+tokeniser_cache/
+models--BAAI--bge-m3/
+CACHEDIR.TAG
+main.py
