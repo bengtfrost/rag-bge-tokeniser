@@ -28,12 +28,16 @@ A high-performance, local RAG (Retrieval-Augmented Generation) solution optimize
 
 ## 🛠 Tools
 
-- `ingest_file`: Index a single file (PDF/MD/TXT) from disk.
-- `ingest_directory`: Batch index directories with a progress bar and ETA.
-- `query`: Hybrid search using Vector ANN + Reranking.
-- `list_collections`: Statistics and document counts per collection.
-- `delete_documents`: Selective deletion of documents or clearing a collection.
-- `delete_collection`: Complete removal of a collection and its vectors.
+| Tool                | Description                                                                                                                                               |
+| :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_collection` | Create a new RAG collection in the database.                                                                                                              |
+| `ingest_file`       | Index a file (Text, PDF, or Markdown) directly from disk. Optimized for large files to bypass LLM context limits. Supports re-indexing with `force=true`. |
+| `ingest_directory`  | Batch index an entire directory. Supports `.txt`, `.pdf`, `.md`, and more. Features parallel processing, progress bars, and ETA reporting.                |
+| `add_documents`     | Index raw text strings directly (e.g., short notes, chat snippets, or clippings).                                                                         |
+| `query`             | Perform a semantic search within a collection using Vector ANN followed by a Reranking stage.                                                             |
+| `list_collections`  | List all collections in the database with document counts.                                                                                                |
+| `delete_documents`  | Remove specific documents by ID or clear an entire collection (by passing an empty list `[]`).                                                            |
+| `delete_collection` | Permanently delete a collection, including all documents, chunks, and metadata.                                                                           |
 
 ## 🚀 Quickstart
 
