@@ -1,43 +1,45 @@
-# RAG BGE-M3 Tokeniser - Local AI Stack (v2.0.0)
+# RAG BGE-M3 Tokenizer - Local AI Stack (v2.0.0)
 
-En högoptimerad, lokal RAG-lösning för Fedora 44 (Sway). Systemet använder exakt token-räkning för chunking och parallell embedding-bearbetning för maximal prestanda vid indexering av stora juridiska arkiv.
+A high-performance, local RAG (Retrieval-Augmented Generation) solution optimized for Fedora 44 (Sway) and Linux environments. This system utilizes exact token counting for chunking and parallel embedding processing to ensure maximum performance when indexing large legal archives or personal document collections.
 
-## ✨ Nyheter i v2.0.0
+## ✨ What's New in v2.0.0
 
-- **Multi-format Support:** Ingest av PDF, Markdown (.md), RST och ren text.
-- **Parallell Indexering:** Använder `asyncio.Semaphore` för att bearbeta flera filer samtidigt utan att blockera.
-- **Force Re-indexing:** Stöd för `--force` flagga för att uppdatera existerande dokument.
-- **Konfigurerbar via Env:** Styr batch-storlekar, chunk-storlek och timeouts via miljövariabler.
-- **Robust ID-hantering:** Normaliserade `doc_id` (t.ex. `lag.pdf`) för att undvika kollisioner.
+- **Multi-format Support:** Ingest PDF, Markdown (.md), RST, and plain text.
+- **Parallel Indexing:** Uses `asyncio.Semaphore` to process multiple files concurrently without blocking the server.
+- **Force Re-indexing:** Support for the `force=true` flag to overwrite and update existing documents.
+- **Environment Configurable:** Control batch sizes, chunk sizes, and timeouts via environment variables.
+- **Robust ID Handling:** Normalized `doc_id` generation (e.g., `document.pdf`) to prevent collisions across different formats.
 
-## 🏗 Arkitektur
+## 🏗 Architecture
 
-- **LLM Engine:** `llama-server` (Port 11434)
-- **Embedding Engine:** `llama-server` @ BGE-M3 (Port 11435)
-- **Reranker Engine:** `llama-server` @ BGE-Reranker-v2-m3 (Port 11436)
-- **Database:** SQLite med `sqlite-vec` för vektorsökning.
+- **LLM Engine:** `llama-server` (Port 11434) - Handles reasoning and chat.
+- **Embedding Engine:** `llama-server` @ BGE-M3 (Port 11435) - Generates 1024-dim vectors.
+- **Reranker Engine:** `llama-server` @ BGE-Reranker-v2-m3 (Port 11436) - Scores search results for accuracy.
+- **Database:** SQLite with the `sqlite-vec` extension for local vector storage and metadata.
 
-## ⚙️ Miljövariabler (Optional)
+## ⚙️ Environment Variables (Optional)
 
-| Variabel               | Beskrivning                              | Standard |
-| :--------------------- | :--------------------------------------- | :------- |
-| `RAG_CHUNK_SIZE`       | Max tokens per segment                   | 512      |
-| `RAG_CHUNK_OVERLAP`    | Överlappande tokens                      | 64       |
-| `RAG_MAX_CONCURRENT`   | Max antal filer som indexeras parallellt | 3        |
-| `RAG_EMBED_BATCH_SIZE` | Chunks per embedding-anrop               | 8        |
+| Variable               | Description                         | Default |
+| :--------------------- | :---------------------------------- | :------ |
+| `RAG_CHUNK_SIZE`       | Maximum tokens per segment          | 512     |
+| `RAG_CHUNK_OVERLAP`    | Overlapping tokens between segments | 64      |
+| `RAG_MAX_CONCURRENT`   | Max files indexed in parallel       | 3       |
+| `RAG_EMBED_BATCH_SIZE` | Chunks per embedding API call       | 8       |
 
-## 🛠 Verktyg (Tools)
+## 🛠 Tools
 
-- `ingest_file`: Indexera enskild fil (PDF/MD/TXT).
-- `ingest_directory`: Massindexera kataloger med progress-bar och ETA.
-- `query`: Hybrid-sökning med Vektor + Reranking.
-- `list_collections`: Statistik över dokument per samling.
-- `delete_documents`: Selektiv radering eller rensning av samling.
+- `ingest_file`: Index a single file (PDF/MD/TXT) from disk.
+- `ingest_directory`: Batch index directories with a progress bar and ETA.
+- `query`: Hybrid search using Vector ANN + Reranking.
+- `list_collections`: Statistics and document counts per collection.
+- `delete_documents`: Selective deletion of documents or clearing a collection.
+- `delete_collection`: Complete removal of a collection and its vectors.
 
-## 🚀 Snabbstart
+## 🚀 Quickstart
+
+### 1. Setup your Alias (~/.zshrc or ~/.bashrc)
 
 ```bash
-# Starta agenten (~/.zshrc alias)
 alias ai-agent-rag='export OPENAI_API_KEY="sk-unused" && \
   export MCP_STREAMING_FIRST_CHUNK_TIMEOUT=3600 && \
   export MCP_STREAMING_CHUNK_TIMEOUT=3600 && \
@@ -48,8 +50,4 @@ alias ai-agent-rag='export OPENAI_API_KEY="sk-unused" && \
     --api-key "sk-unused" \
     --model "local" \
     --config-file ~/.config/mcp-cli/server_config.json'
-
-# Exempel: Indexera en juridisk PDF
-# Inuti chatten:
-# "Ingest /home/bfrost/ai-docs/juridik/doktrin/Offentlig_ratt_allmant.pdf till juridik_doktrin"
 ```
