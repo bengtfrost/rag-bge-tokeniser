@@ -5,11 +5,15 @@ build/
 dist/
 wheels/
 *.egg-info
+main.py
 
 # Virtual environments
 .venv
-tokeniser_cache/
-tokeniser_cache/
+
+# Hugging Face cache & Tokenizer data
 models--BAAI--bge-m3/
+tokeniser_cache/
 CACHEDIR.TAG
-main.py
+
+# Miljöfiler
+.python-version
