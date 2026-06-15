@@ -17,7 +17,7 @@ A high-performance, local RAG (Retrieval-Augmented Generation) solution optimize
 
 ```mermaid
 graph TD
-    A[Goose Agent] -->|Port 4000| B(LiteLLM Gateway)
+    A[goose Agent] -->|Port 4000| B(LiteLLM Gateway)
     B -->|Port 11434| C(Local LLM: Gemma/DeepSeek)
     B -->|Cloud API| D(Mistral/Gemini)
     A --- |MCP: STDIO| E{Sovereign Tools}
