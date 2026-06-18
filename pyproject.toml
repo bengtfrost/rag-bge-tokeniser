@@ -1,13 +1,15 @@
+# ~/.config/rag-bge-tokeniser/pyproject.toml 
+
 [project]
 name = "rag-bge-tokeniser"
-version = "0.1.0"
-description = "Add your description here"
+version = "0.2.0"
+description = "Sovereign Swedish RAG server with embedded query expansion middleware"
 requires-python = ">=3.13"
 dependencies = [
-    "httpx>=0.28.1",
-    "mcp>=1.27.2",
-    "pypdf>=6.13.2",
-    "sentencepiece>=0.2.1",
-    "sqlite-vec>=0.1.9",
-    "transformers>=5.11.0",
+  "httpx>=0.28.1",
+  "mcp>=1.27.2",
+  "pypdf>=6.13.2",
+  "sentencepiece>=0.2.1",
+  "sqlite-vec>=0.1.9",
+  "transformers>=5.11.0",
 ]
