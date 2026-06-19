@@ -71,23 +71,28 @@ Configure it by saving your model configurations to `~/.config/agentgateway/conf
 Update your Goose configuration to run the tools natively over stdio, while directing all LLM model requests to Agentgateway on Port 4000:
 
 ```yaml
+# ~/.config/goose/config.yaml
 GOOSE_TELEMETRY_ENABLED: false
 active_provider: openai
 
+# --- 1. PROVIDERS (LLM requests routed through Agentgateway) ---
 providers:
   openai:
     type: openai
     base_url: http://localhost:4000/v1
     api_key: sk-unused
 
+# --- 2. EXTENSIONS (100% Stable Local STDIO Subprocesses) ---
 extensions:
   rag:
     enabled: true
     name: rag
     type: stdio
-    cmd: /home/USER/.config/rag-bge-tokeniser/.venv/bin/python
+    cmd: /home/bfrost/.config/rag-bge-tokeniser/.venv/bin/python
     args:
-      - /home/USER/.config/rag-bge-tokeniser/rag_server.py
+      - /home/bfrost/.config/rag-bge-tokeniser/rag_server.py
+    timeout: 14400 # 4 hours - protects heavy batch directory indexing and deep reranking passes
+
   sqlite:
     enabled: true
     name: sqlite
@@ -96,7 +101,9 @@ extensions:
     args:
       - mcp-server-sqlite
       - --db-path
-      - /home/USER/.local/share/rag-bge-tokeniser/vectors.db
+      - /home/bfrost/.local/share/rag-bge-tokeniser/vectors.db
+    timeout: 300 # 5 minutes - safe for standard metadata database queries
+
   fetch:
     enabled: true
     name: fetch
@@ -104,7 +111,9 @@ extensions:
     cmd: uvx
     args:
       - mcp-server-fetch
+    timeout: 300 # 5 minutes - protects against hung or slow external web-fetch requests
 
+  # --- Built-in Goose Platform Extensions ---
   developer:
     enabled: true
     type: builtin
