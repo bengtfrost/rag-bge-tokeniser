@@ -64,7 +64,94 @@ chmod +x agentgateway-linux-amd64
 mv agentgateway-linux-amd64 ~/.local/bin/agentgateway
 ```
 
-Configure it by saving your model configurations to `~/.config/agentgateway/config.yaml`.
+Configure the LLM gateway by creating your configuration file at `~/.config/agentgateway/config.yaml` to unify your local model ports and establish encrypted HTTPS TLS tunnels to cloud APIs:
+
+```yaml
+# ~/.config/agentgateway/config.yaml
+config:
+  logging:
+    level: info
+    format: text
+  adminAddr: localhost:15000 # Built-in interactive Admin UI and Playground
+
+llm:
+  port: 4000
+  models:
+    # ── Local Models (llama-server) ──
+    - name: local-llama-server
+      provider: openAI
+      params:
+        hostOverride: localhost:11434
+    - name: local-llama-server-embed
+      provider: openAI
+      params:
+        hostOverride: localhost:11435
+    - name: local-llama-server-rerank
+      provider: openAI
+      params:
+        hostOverride: localhost:11436
+    - name: local-llama-server-rerank-2
+      provider: openAI
+      params:
+        hostOverride: localhost:11437
+
+    # ── Mistral Cloud Models (backendTLS on model-level) ──
+    - name: mistral-large-latest
+      provider: openAI
+      backendTLS: {}
+      params:
+        model: mistral-large-latest
+        hostOverride: api.mistral.ai:443
+        apiKey: $MISTRAL_API_KEY
+
+    - name: mistral-medium-latest
+      provider: openAI
+      backendTLS: {}
+      params:
+        model: mistral-medium-latest
+        hostOverride: api.mistral.ai:443
+        apiKey: $MISTRAL_API_KEY
+
+    - name: pixtral-large-latest
+      provider: openAI
+      backendTLS: {}
+      params:
+        model: pixtral-large-latest
+        hostOverride: api.mistral.ai:443
+        apiKey: $MISTRAL_API_KEY
+
+    - name: codestral-latest
+      provider: openAI
+      backendTLS: {}
+      params:
+        model: codestral-latest
+        hostOverride: api.mistral.ai:443
+        apiKey: $MISTRAL_API_KEY
+
+    - name: mistral-embed
+      provider: openAI
+      backendTLS: {}
+      params:
+        model: mistral-embed
+        hostOverride: api.mistral.ai:443
+        apiKey: $MISTRAL_API_KEY
+
+    - name: codestral-embed
+      provider: openAI
+      backendTLS: {}
+      params:
+        model: codestral-embed
+        hostOverride: api.mistral.ai:443
+        apiKey: $MISTRAL_API_KEY
+
+    # ── Gemini Cloud Models ──
+    - name: gemini-3.5-flash
+      provider: gemini
+      params:
+        model: gemini-3.5-flash
+        apiKey: $GEMINI_API_KEY
+binds: []
+```
 
 ### 2. Configure Goose (`~/.config/goose/config.yaml`)
 
@@ -154,8 +241,10 @@ _goose_session() {
     local embed="${2:-local-llama-server-embed}"
     local rerank="${3:-local-llama-server-rerank}"
     
+    # 1. Starta Agentgateway. Om det misslyckas, avbryt direkt.
     _ensure_agentgateway || return 1
     
+    # 2. Sätt miljövariabler rad för rad (säkert och utan snedstreck)
     export OPENAI_API_KEY="sk-unused"
     export OPENAI_BASE_URL="http://localhost:4000/v1"
     export RAG_EMBED_MODEL="$embed"
@@ -164,6 +253,7 @@ _goose_session() {
     export RAG_MAX_CONCURRENT=4      # Aligns perfectly with 4-core CPUs
     export OPENAI_TIMEOUT=14400      # 4 hours (prevents Goose timeouts during heavy local prefill)
     
+    # 3. Starta Goose-sessionen
     GOOSE_MODEL="$model" goose session
 }
 
@@ -173,7 +263,7 @@ alias goose-mistral='_goose_session mistral-large-latest local-llama-server-embe
 
 # --- ENGLISH STACK (Mxbai Reranker on Port 11437) ---
 alias goose-local-en='_goose_session local-llama-server local-llama-server-embed local-llama-server-rerank-2'
-alias goose-mistral-en='_goose_session mistral-large-latest local-llama-server-embed local-llama-server-rerank-2'
+alias goose-local-en-mistral='_goose_session mistral-large-latest local-llama-server-embed local-llama-server-rerank-2'
 ```
 
 ---
