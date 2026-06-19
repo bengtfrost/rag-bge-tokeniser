@@ -140,11 +140,13 @@ Add the unified helper and aliases to your shell configuration to ensure proper 
 # Säkrar Agentgateway-processen med tvingat miljöarv för API-nycklar
 _ensure_agentgateway() {
     if ! ss -tulpn | grep -q ":4000 "; then
-        echo "🚀 Starting Agentgateway (LLM: 4000)..."
+        echo "🚀 Starting Agentgateway (LLM: 4000 | MCP 3000 Deactivated - Stdio Active)..."
+        # Injicera dina lokala nycklar direkt till bakgrundsprocessen vid start
         (MISTRAL_API_KEY="$MISTRAL_API_KEY" GEMINI_API_KEY="$GEMINI_API_KEY" agentgateway -f ~/.config/agentgateway/config.yaml > /dev/null 2>&1 &)
         while ! ss -tulpn | grep -q ":4000 "; do sleep 1; done
     fi
 }
+
 
 # Centraliserad sessionsstartare för Goose
 _goose_session() {
